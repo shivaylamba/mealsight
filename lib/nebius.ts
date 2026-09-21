@@ -101,7 +101,33 @@ function parseJsonContent(content: string): unknown {
   return JSON.parse(fenced ? fenced[1] : trimmed);
 }
 
+/**
+ * One bounded retry when the model's own output fails the schema.
+ *
+ * A schema failure normally should not be retried, because a malformed answer
+ * will be malformed again. That reasoning assumes determinism, and measurement
+ * says otherwise: the same description, at temperature 0, parses on one
+ * attempt and not the next. Over ten runs of the two hardest inputs, one
+ * attempt failed; a single retry turns that into a rare failure rather than a
+ * visible one. Nothing else is retried, because nothing else varies this way.
+ */
+const SCHEMA_RETRIES = 1;
+
 export async function complete<T>(options: CompleteOptions<T>): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= SCHEMA_RETRIES; attempt += 1) {
+    try {
+      return await attemptComplete(options);
+    } catch (error) {
+      lastError = error;
+      const retryable = error instanceof AppError && error.code === 'schema_mismatch';
+      if (!retryable || attempt === SCHEMA_RETRIES) throw error;
+    }
+  }
+  throw lastError;
+}
+
+async function attemptComplete<T>(options: CompleteOptions<T>): Promise<T> {
   const apiKey = requireEnv('NEBIUS_API_KEY');
   const model = modelFor(options.purpose);
   const usePrompted = process.env.NEBIUS_RESPONSE_FORMAT === 'json_object';

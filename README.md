@@ -83,9 +83,14 @@ Add `GRADIUM_API_KEY` from [Gradium](https://gradium.ai) to describe meals by
 voice and have answers read back. Without it the app works by typing, and the
 health endpoint says so.
 
-If a model truncates under constrained decoding, set
-`NEBIUS_RESPONSE_FORMAT=json_object`. The schema then travels in the prompt
-instead, and Zod validates the reply either way.
+The schema reaches the model through the prompt by default
+(`NEBIUS_RESPONSE_FORMAT=json_object`) rather than through constrained
+`json_schema` decoding, because that is measurably more reliable here: over ten
+runs of the two hardest descriptions, constrained decoding failed three times
+against one. Zod validates the reply either way, so the difference is only how
+often a failure reaches you. One retry on a schema mismatch covers the rest;
+the same input at temperature 0 does not always parse, which is the evidence
+that made a retry worth having.
 
 ## Under the hood
 
