@@ -50,6 +50,10 @@ items, and never look at the confidence sitting next to them.
   how much" is a real meal that deserves a question, not a rejection.
 - **Names what it cannot see.** Cooking oil, ghee, a possible cream finish: the
   things that change the answer and do not show up in a photograph.
+- **Uses your answer.** Answering a question folds it back into the description
+  and reads the meal again. Answering "yes, ghee" turns an assumption into a
+  listed item with its own portion and confidence. Asking and then ignoring the
+  reply would be worse than not asking.
 - **Treats your words as evidence, never instructions.** Descriptions and
   transcripts are wrapped in delimiters that the text itself cannot close.
 

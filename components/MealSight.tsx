@@ -66,7 +66,7 @@ export default function MealSight() {
     reader.readAsDataURL(file);
   }, []);
 
-  async function analyse() {
+  async function analyse(withDescription: string = description) {
     setBusy('Reading the meal…');
     setFailure(null);
     setResult(null);
@@ -75,13 +75,14 @@ export default function MealSight() {
       const response = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image, description: description.trim() || null }),
+        body: JSON.stringify({ image, description: withDescription.trim() || null }),
       });
       if (!response.ok) {
         setFailure(await failureFrom(response));
         return;
       }
       setResult((await response.json()) as Result);
+      setAnswers({});
     } catch {
       setFailure({ message: 'The network is unavailable. Try again.', code: 'network' });
     } finally {
@@ -176,7 +177,26 @@ export default function MealSight() {
     }
   }
 
+  /**
+   * Asking a question and then ignoring the reply would be worse than not
+   * asking. The answers are folded back into the description and the meal is
+   * read again, so a correction actually changes the result.
+   */
+  async function reanalyseWithAnswers() {
+    if (!result) return;
+    const answered = result.questions
+      .filter((item) => answers[item.id] && answers[item.id] !== 'Not sure')
+      .map((item) => `${item.question} ${answers[item.id]}`);
+    if (!answered.length) return;
+    const combined = [description.trim(), ...answered].filter(Boolean).join(' ');
+    setDescription(combined);
+    await analyse(combined);
+  }
+
   const canAnalyse = Boolean(image || description.trim()) && busy === null;
+  const answeredCount = result
+    ? result.questions.filter((item) => answers[item.id] && answers[item.id] !== 'Not sure').length
+    : 0;
 
   return (
     <>
@@ -248,6 +268,18 @@ export default function MealSight() {
               </div>
             </div>
           ))}
+
+          {answeredCount > 0 && (
+            <div className="row" style={{ marginTop: 0, marginBottom: 14 }}>
+              <button
+                className="primary"
+                disabled={busy !== null}
+                onClick={() => void reanalyseWithAnswers()}
+              >
+                Read it again with {answeredCount === 1 ? 'my answer' : 'my answers'}
+              </button>
+            </div>
+          )}
 
           {result.foods.map((food) => {
             const label = confidenceLabel(food.confidence);
