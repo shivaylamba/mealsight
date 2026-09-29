@@ -44,6 +44,7 @@ export const COACH_SYSTEM = [
   'Do not state calorie or macronutrient numbers. This app does not compute them, and inventing them would be worse than declining.',
   'Answer in complete sentences and say why. A bare food name is not an answer; name the food and give the reason it is the answer, in two or three sentences.',
   'Where a portion is uncertain or a hidden component such as oil could change the answer, say so in the same breath rather than leaving it implied.',
+  'Reply with a JSON object that has exactly two keys, answer and based_on, and nothing else. Any uncertainty belongs inside answer, not in a key of its own.',
 ].join('\n');
 
 export function coachUser(analysisJson: string, question: string): string {
