@@ -640,7 +640,8 @@ input[type='text'] {
   border-radius: 12px;
   background: var(--paper);
   padding: 12px 14px;
-  font-size: 0.9375rem;
+  /* 16px or more, or iOS Safari zooms the page when the field takes focus. */
+  font-size: 1rem;
   line-height: 1.5;
   transition: border-color 0.15s;
 }
@@ -1043,6 +1044,22 @@ input::placeholder {
   }
   .cta-band .button {
     width: 100%;
+  }
+}
+/* Fingers need 44px; a mouse does not, so desktop keeps the tighter chips. */
+@media (pointer: coarse) {
+  .chip,
+  .chip-button,
+  .button.small,
+  .mic {
+    min-height: 44px;
+  }
+  .mic {
+    width: 44px;
+    height: 44px;
+  }
+  .site-nav nav a:not(.button) {
+    padding: 12px 0;
   }
 }
 @media (prefers-reduced-motion: reduce) {
