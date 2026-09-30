@@ -75,7 +75,8 @@ Set `NEBIUS_API_KEY` in `.env.local`, then:
 npm run dev
 ```
 
-Open http://localhost:3000, describe a meal or pick a photograph, and press
+Open http://localhost:3000 for the landing page, or go straight to
+http://localhost:3000/analyse, add a photograph or a description, and press
 **Analyse this meal**.
 
 There is no default model, on purpose: an unset `NEBIUS_VISION_MODEL` fails with
@@ -155,6 +156,10 @@ If you change a threshold in `lib/gate.ts`, say what evidence moved it. The
 current numbers came from running the same cases across a catalog of models and
 watching which signal actually separated food from everything else. It was
 `contains_food`, not confidence.
+
+## Credits
+
+The landing photograph is from [Unsplash](https://images.unsplash.com/photo-1512621776951-a57141f2eefd). Fonts: Manrope and Onest via Google Fonts. Icons: [Lucide](https://lucide.dev).
 
 ## License
 
