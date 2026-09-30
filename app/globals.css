@@ -996,7 +996,6 @@ input::placeholder {
   padding: 18px;
   border-radius: 12px;
   background: var(--sunk);
-  border-left: 3px solid var(--leaf);
 }
 .answer-foot {
   display: flex;
