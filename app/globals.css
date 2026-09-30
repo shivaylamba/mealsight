@@ -31,9 +31,16 @@ body {
   background: var(--paper);
   color: var(--ink);
   font-family: var(--font-body), system-ui, sans-serif;
-  font-size: 0.9375rem;
+  font-size: 1rem;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
+}
+h1,
+h2 {
+  text-wrap: balance;
+}
+p {
+  text-wrap: pretty;
 }
 h1,
 h2,
@@ -421,7 +428,7 @@ img {
 .stack p {
   color: var(--muted);
   margin-top: 6px;
-  font-size: 0.9rem;
+  font-size: 1rem;
 }
 .principles {
   display: grid;
