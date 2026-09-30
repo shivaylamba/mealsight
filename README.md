@@ -90,6 +90,12 @@ photographs just as well; it is the second choice only because it more often
 returns a reply that fails validation on things that are not food, which still
 ends in an error rather than a wrong answer.
 
+Deployed publicly, every visitor spends your model credit. `proxy.ts` allows
+30 paid requests (analyse, coach, voice) per address per 10 minutes, set by
+`RATE_LIMIT_PER_10_MIN`. Counts live in memory per server instance, so this
+stops one script looping on the API, not a determined crowd: set a spending
+cap on your Nebius account as well.
+
 Add `GRADIUM_API_KEY` from [Gradium](https://gradium.ai) to describe meals by
 voice and have answers read back. Without it the app works by typing, and the
 health endpoint says so.
