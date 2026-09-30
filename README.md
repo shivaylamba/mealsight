@@ -83,6 +83,13 @@ a message naming the variable rather than quietly billing a model you did not
 choose. `.env.example` suggests a working pair. Any vision-capable catalog model
 will do, and `GET /api/health` reports which variables are still missing.
 
+If every analysis comes back with a `timeout` error while the coach still
+answers, the vision model itself is unavailable on Nebius, not the app. Switch
+to `NEBIUS_VISION_MODEL=google/gemma-3-27b-it` and restart. It reads meals and
+photographs just as well; it is the second choice only because it more often
+returns a reply that fails validation on things that are not food, which still
+ends in an error rather than a wrong answer.
+
 Add `GRADIUM_API_KEY` from [Gradium](https://gradium.ai) to describe meals by
 voice and have answers read back. Without it the app works by typing, and the
 health endpoint says so.
