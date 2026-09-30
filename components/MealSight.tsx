@@ -38,8 +38,37 @@ async function failureFrom(response: Response): Promise<Failure> {
       code: body.code ?? 'error',
     };
   } catch {
+    // The host answered before the app did, so only the status is meaningful.
+    if (response.status === 413)
+      return { message: 'That image is too large to send. Try a smaller one.', code: 'too_large' };
+    if (response.status === 504)
+      return { message: 'The model took too long to answer. Try again.', code: 'timeout' };
     return { message: 'That request could not finish.', code: 'error' };
   }
+}
+
+/**
+ * The longest edge sent to the model. Hosts cap request bodies (Vercel at
+ * 4.5 MB), and a phone photo or Retina screenshot is often larger than that
+ * once base64-encoded. Vision models downscale to about this size anyway, so
+ * shrinking here loses nothing the model would have seen.
+ */
+const MAX_EDGE = 1568;
+
+async function prepareImage(file: File): Promise<string> {
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, MAX_EDGE / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(bitmap.width * scale);
+  canvas.height = Math.round(bitmap.height * scale);
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('Canvas is unavailable.');
+  // JPEG has no transparency; a white ground keeps transparent PNGs readable.
+  context.fillStyle = '#fff';
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+  return canvas.toDataURL('image/jpeg', 0.85);
 }
 
 export default function MealSight() {
@@ -57,13 +86,17 @@ export default function MealSight() {
 
   const pickImage = useCallback((file: File | undefined) => {
     if (!file) return;
-    if (file.size > 12 * 1024 * 1024) {
-      setFailure({ message: 'That image is too large. Use one under 12 MB.', code: 'too_large' });
+    if (file.size > 25 * 1024 * 1024) {
+      setFailure({ message: 'That image is too large. Use one under 25 MB.', code: 'too_large' });
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => setImage(typeof reader.result === 'string' ? reader.result : null);
-    reader.readAsDataURL(file);
+    setFailure(null);
+    prepareImage(file).then(setImage, () =>
+      setFailure({
+        message: 'That file could not be read as an image. Try a JPEG or PNG.',
+        code: 'unreadable_image',
+      }),
+    );
   }, []);
 
   async function analyse(withDescription: string = description) {
