@@ -165,9 +165,9 @@ export default function Landing() {
           <ol className="steps">
             {steps.map(({ icon: Icon, title, body }, index) => (
               <li key={title} className="step">
-                <span className="step-index">0{index + 1}</span>
-                <span className="step-icon">
-                  <Icon size={20} aria-hidden="true" />
+                <span className="step-index">
+                  0{index + 1}
+                  <Icon size={18} aria-hidden="true" />
                 </span>
                 <h3>{title}</h3>
                 <p>{body}</p>

@@ -390,31 +390,31 @@ img {
   grid-template-columns: repeat(3, 1fr);
   gap: 18px;
 }
+/* An open sequence on a shared rule, not three boxed cards. */
+.steps {
+  gap: clamp(20px, 4vw, 48px) !important;
+}
 .step {
-  position: relative;
-  padding: 26px;
-  border-radius: var(--radius);
-  background: var(--surface);
-  border: 1px solid var(--line);
+  padding-top: 22px;
+  border-top: 2px solid var(--ink-strong);
 }
 .step-index {
-  position: absolute;
-  top: 22px;
-  right: 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 36px;
   font-family: var(--font-heading), sans-serif;
   font-weight: 600;
-  font-size: 0.8125rem;
+  font-size: 2.5rem;
+  letter-spacing: -0.05em;
+  line-height: 1;
+  color: var(--green);
+}
+.step-index svg {
   color: var(--muted);
 }
-.step-icon {
-  display: inline-grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
-  background: var(--lime);
-  color: var(--ink-strong);
-  margin-bottom: 18px;
+.step h3 {
+  font-size: 1.125rem;
 }
 .step p,
 .principle-list p,
