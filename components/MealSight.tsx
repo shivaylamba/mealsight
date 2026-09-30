@@ -306,11 +306,17 @@ export default function MealSight() {
   const answeredCount = result
     ? result.questions.filter((item) => answers[item.id] && answers[item.id] !== NOT_SURE).length
     : 0;
+  // Rounded up to a round number with headroom, so no band runs into the
+  // edge and the axis label reads as a scale rather than a coincidence.
   const scale = result
-    ? Math.max(
-        100,
-        ...result.foods.map((food) => food.portion_range?.max_grams ?? food.estimated_grams ?? 0),
-      )
+    ? Math.ceil(
+        (Math.max(
+          80,
+          ...result.foods.map((food) => food.portion_range?.max_grams ?? food.estimated_grams ?? 0),
+        ) *
+          1.1) /
+          50,
+      ) * 50
     : 100;
 
   return (
@@ -534,6 +540,10 @@ export default function MealSight() {
                 </div>
               )}
 
+              <div className="scale-legend" aria-hidden="true">
+                <span>Portion range, one scale for every food</span>
+                <span className="tabular">0 – {scale} g</span>
+              </div>
               <ul className="foods">
                 {result.foods.map((food) => {
                   const label = confidenceLabel(food.confidence);

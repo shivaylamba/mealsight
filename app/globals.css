@@ -890,9 +890,18 @@ input::placeholder {
   border-color: var(--ink-strong);
   color: var(--surface);
 }
+.scale-legend {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 24px;
+  padding-bottom: 10px;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
 .foods {
   list-style: none;
-  margin: 22px 0 0;
+  margin: 0;
   padding: 0;
 }
 .food {
