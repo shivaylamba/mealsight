@@ -12,7 +12,7 @@ import {
   ShieldCheck,
   Sparkles,
 } from 'lucide-react';
-import { Brand } from '@/components/Brand';
+import { SiteNav } from '@/components/SiteNav';
 import plate from '@/public/plate.jpg';
 
 const REPO = 'https://github.com/shivaylamba/mealsight';
@@ -79,19 +79,7 @@ const stack = [
 export default function Landing() {
   return (
     <div className="landing">
-      <header className="site-nav">
-        <Brand />
-        <nav aria-label="Main">
-          <a href="#how">How it works</a>
-          <a href="#principles">Principles</a>
-          <a href={REPO} className="nav-external">
-            GitHub <ArrowUpRight size={14} aria-hidden="true" />
-          </a>
-          <Link href="/analyse" className="button primary small">
-            Try it
-          </Link>
-        </nav>
-      </header>
+      <SiteNav cta />
 
       <main id="main">
         <section className="hero">

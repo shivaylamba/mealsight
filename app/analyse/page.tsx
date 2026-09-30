@@ -1,7 +1,5 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
-import { ArrowUpRight } from 'lucide-react';
-import { Brand } from '@/components/Brand';
+import { SiteNav } from '@/components/SiteNav';
 import MealSight from '@/components/MealSight';
 
 export const metadata: Metadata = { title: 'Analyse a meal · MealSight' };
@@ -9,15 +7,7 @@ export const metadata: Metadata = { title: 'Analyse a meal · MealSight' };
 export default function AnalysePage() {
   return (
     <div className="app-shell">
-      <header className="site-nav compact">
-        <Brand />
-        <nav aria-label="Main">
-          <Link href="/#how">How it works</Link>
-          <a href="https://github.com/shivaylamba/mealsight" className="nav-external">
-            GitHub <ArrowUpRight size={14} aria-hidden="true" />
-          </a>
-        </nav>
-      </header>
+      <SiteNav />
       <main id="main" className="app-main">
         <div className="app-heading">
           <p className="eyebrow">

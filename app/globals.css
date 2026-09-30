@@ -252,12 +252,30 @@ img {
   gap: 26px;
   font-size: 0.875rem;
 }
-.site-nav nav a:not(.button) {
+.nav-link {
+  position: relative;
+  padding: 6px 0;
   text-decoration: none;
   color: var(--muted);
+  transition: color 0.15s;
 }
-.site-nav nav a:not(.button):hover {
+.nav-link:hover {
   color: var(--ink-strong);
+}
+/* The current page, marked the way Tend marks its selected tab. */
+.nav-link[aria-current='page'] {
+  color: var(--ink-strong);
+  font-weight: 600;
+}
+.nav-link[aria-current='page']::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -2px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--leaf);
 }
 .nav-external {
   display: inline-flex;
@@ -1038,8 +1056,12 @@ input::placeholder {
   }
 }
 @media (max-width: 640px) {
-  .site-nav nav a:not(.button) {
-    display: none;
+  .site-nav nav {
+    gap: 18px;
+  }
+  .nav-external,
+  .nav-cta {
+    display: none !important;
   }
   .hero-actions .button {
     flex: 1 1 100%;
@@ -1066,7 +1088,7 @@ input::placeholder {
     width: 44px;
     height: 44px;
   }
-  .site-nav nav a:not(.button) {
+  .nav-link {
     padding: 12px 0;
   }
 }
