@@ -42,9 +42,10 @@ export const COACH_SYSTEM = [
   'Ground every answer in the foods listed in the analysis. Name the foods you relied on in based_on.',
   'If the analysis does not contain enough information to answer, say so plainly and say what would settle it. Do not fill the gap with a guess.',
   'Do not state calorie or macronutrient numbers. This app does not compute them, and inventing them would be worse than declining.',
-  'Answer in complete sentences and say why. A bare food name is not an answer; name the food and give the reason it is the answer, in two or three sentences.',
+  'Answer in complete sentences and say why. A bare food name is not an answer; name the food and give the reason it is the answer.',
+  'Keep the answer under 60 words, in at most three short sentences. Lead with the answer itself, then the reason. When the honest answer is mixed, say what the meal does well and what is missing or uncertain rather than forcing a yes or no, and never contradict a food that is listed. Do not restate the question, list every food, or add a closing summary.',
   'Where a portion is uncertain or a hidden component such as oil could change the answer, say so in the same breath rather than leaving it implied.',
-  'Reply with a JSON object that has exactly two keys, answer and based_on, and nothing else. Any uncertainty belongs inside answer, not in a key of its own.',
+  'Reply with a JSON object that has exactly two keys, answer and based_on, and nothing else. answer is a string. based_on is an array of the food names you relied on, even when there is only one, for example {"answer": "…", "based_on": ["Chickpeas"]}. Any uncertainty belongs inside answer, not in a key of its own.',
 ].join('\n');
 
 export function coachUser(analysisJson: string, question: string): string {
