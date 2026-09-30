@@ -1,6 +1,20 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  AlertCircle,
+  ArrowRight,
+  Camera,
+  Check,
+  ImagePlus,
+  Loader2,
+  Mic,
+  RotateCcw,
+  Send,
+  Square,
+  Volume2,
+  X,
+} from 'lucide-react';
 import type { Food } from '@/lib/schema';
 
 type Question = { id: string; question: string; options: string[] };
@@ -14,6 +28,16 @@ type Result = {
 };
 
 type Failure = { message: string; code: string };
+
+type Busy = 'analysing' | 'asking' | 'speaking' | 'transcribing' | null;
+
+const NOT_SURE = 'Not sure';
+
+/** Models often offer their own "unsure"; the page always adds one, so drop theirs. */
+function answerOptions(options: string[]): string[] {
+  const unsure = /^(unsure|not sure|don'?t know|unknown|no idea)$/i;
+  return [...options.filter((option) => !unsure.test(option.trim())), NOT_SURE];
+}
 
 function confidenceLabel(value: number): { text: string; className: string } {
   if (value >= 0.75) return { text: 'confident', className: 'high' };
@@ -71,10 +95,51 @@ async function prepareImage(file: File): Promise<string> {
   return canvas.toDataURL('image/jpeg', 0.85);
 }
 
+/** Seconds since `active` became true, for a wait that can run to a minute. */
+function useElapsed(active: boolean): number {
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    if (!active) return;
+    const started = Date.now();
+    setElapsed(0);
+    const timer = setInterval(() => setElapsed(Math.floor((Date.now() - started) / 1000)), 1000);
+    return () => clearInterval(timer);
+  }, [active]);
+  return elapsed;
+}
+
+/**
+ * The portion drawn to a shared scale, so a 20 g garnish and a 250 g curry
+ * look like what they are, and the width of the band shows the uncertainty.
+ */
+function PortionBar({ food, scale }: { food: Food; scale: number }) {
+  if (!food.portion_range && food.estimated_grams === null) return null;
+  const min = food.portion_range?.min_grams ?? food.estimated_grams!;
+  const max = food.portion_range?.max_grams ?? food.estimated_grams!;
+  const pct = (grams: number) => `${Math.min(100, (grams / scale) * 100)}%`;
+  return (
+    <div className="portion-bar" aria-hidden="true">
+      <span
+        className="portion-band"
+        style={{ left: pct(min), width: `calc(${pct(max)} - ${pct(min)})` }}
+      />
+      {food.estimated_grams !== null && (
+        <span className="portion-mark" style={{ left: pct(food.estimated_grams) }} />
+      )}
+    </div>
+  );
+}
+
+const SUGGESTIONS = [
+  'Is this a balanced meal?',
+  'What is the biggest unknown here?',
+  'What could I add for more protein?',
+];
+
 export default function MealSight() {
   const [image, setImage] = useState<string | null>(null);
   const [description, setDescription] = useState('');
-  const [busy, setBusy] = useState<string | null>(null);
+  const [busy, setBusy] = useState<Busy>(null);
   const [failure, setFailure] = useState<Failure | null>(null);
   const [result, setResult] = useState<Result | null>(null);
   const [answers, setAnswers] = useState<Record<string, string>>({});
@@ -82,7 +147,10 @@ export default function MealSight() {
   const [answer, setAnswer] = useState<{ answer: string; based_on: string[] } | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const recorder = useRef<MediaRecorder | null>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
   const [recording, setRecording] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const elapsed = useElapsed(busy === 'analysing');
 
   const pickImage = useCallback((file: File | undefined) => {
     if (!file) return;
@@ -99,11 +167,17 @@ export default function MealSight() {
     );
   }, []);
 
+  function clearImage() {
+    setImage(null);
+    if (fileInput.current) fileInput.current.value = '';
+  }
+
   async function analyse(withDescription: string = description) {
-    setBusy('Reading the meal…');
+    setBusy('analysing');
     setFailure(null);
     setResult(null);
     setAnswer(null);
+    setAudioUrl(null);
     try {
       const response = await fetch('/api/analyze', {
         method: 'POST',
@@ -123,15 +197,17 @@ export default function MealSight() {
     }
   }
 
-  async function ask() {
-    if (!result || !question.trim()) return;
-    setBusy('Asking…');
+  async function ask(text: string = question) {
+    if (!result || !text.trim()) return;
+    setQuestion(text);
+    setBusy('asking');
     setFailure(null);
+    setAudioUrl(null);
     try {
       const response = await fetch('/api/coach', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ foods: result.foods, question: question.trim() }),
+        body: JSON.stringify({ foods: result.foods, question: text.trim() }),
       });
       if (!response.ok) {
         setFailure(await failureFrom(response));
@@ -146,7 +222,7 @@ export default function MealSight() {
   }
 
   async function readAloud(text: string) {
-    setBusy('Preparing audio…');
+    setBusy('speaking');
     setFailure(null);
     try {
       const response = await fetch('/api/voice/speak', {
@@ -181,7 +257,7 @@ export default function MealSight() {
       media.ondataavailable = (event) => chunks.push(event.data);
       media.onstop = async () => {
         for (const track of stream.getTracks()) track.stop();
-        setBusy('Transcribing…');
+        setBusy('transcribing');
         try {
           const response = await fetch('/api/voice/transcribe', {
             method: 'POST',
@@ -218,7 +294,7 @@ export default function MealSight() {
   async function reanalyseWithAnswers() {
     if (!result) return;
     const answered = result.questions
-      .filter((item) => answers[item.id] && answers[item.id] !== 'Not sure')
+      .filter((item) => answers[item.id] && answers[item.id] !== NOT_SURE)
       .map((item) => `${item.question} ${answers[item.id]}`);
     if (!answered.length) return;
     const combined = [description.trim(), ...answered].filter(Boolean).join(' ');
@@ -226,165 +302,355 @@ export default function MealSight() {
     await analyse(combined);
   }
 
-  const canAnalyse = Boolean(image || description.trim()) && busy === null;
+  const canAnalyse = Boolean(image || description.trim()) && busy === null && !recording;
   const answeredCount = result
-    ? result.questions.filter((item) => answers[item.id] && answers[item.id] !== 'Not sure').length
+    ? result.questions.filter((item) => answers[item.id] && answers[item.id] !== NOT_SURE).length
     : 0;
+  const scale = result
+    ? Math.max(
+        100,
+        ...result.foods.map((food) => food.portion_range?.max_grams ?? food.estimated_grams ?? 0),
+      )
+    : 100;
 
   return (
-    <>
-      {failure && (
-        <p className="banner error" role="alert">
-          {failure.message}
-        </p>
-      )}
+    <div className="workspace">
+      <section className="panel capture" aria-labelledby="capture-title">
+        <div className="panel-head">
+          <p className="eyebrow">01 / Your meal</p>
+          <h2 id="capture-title">Show or tell</h2>
+        </div>
 
-      <section className="card">
-        <label htmlFor="photo">Photograph</label>
         <input
+          ref={fileInput}
           id="photo"
+          className="visually-hidden"
           type="file"
           accept="image/jpeg,image/png,image/webp"
           onChange={(event) => pickImage(event.target.files?.[0])}
         />
-        {image && <img className="preview" src={image} alt="The meal you selected" />}
-
-        <div style={{ marginTop: 18 }}>
-          <label htmlFor="description">Description</label>
-          <textarea
-            id="description"
-            rows={3}
-            maxLength={2000}
-            value={description}
-            placeholder="Rice, dal and a vegetable sabzi. Two ladles of dal."
-            onChange={(event) => setDescription(event.target.value)}
-          />
-        </div>
-
-        <div className="row">
-          <button className="primary" disabled={!canAnalyse} onClick={() => void analyse()}>
-            {busy === 'Reading the meal…' ? 'Reading…' : 'Analyse this meal'}
-          </button>
-          <button onClick={() => void toggleRecording()} disabled={busy !== null && !recording}>
-            {recording ? 'Stop recording' : 'Describe by voice'}
-          </button>
-          {busy && (
-            <span className="meta" role="status">
-              {busy}
+        {image ? (
+          <figure className="photo">
+            <img src={image} alt="The meal you selected" />
+            <div className="photo-actions">
+              <label htmlFor="photo" className="chip-button">
+                <Camera size={15} aria-hidden="true" /> Replace
+              </label>
+              <button type="button" className="chip-button" onClick={clearImage}>
+                <X size={15} aria-hidden="true" /> Remove
+              </button>
+            </div>
+          </figure>
+        ) : (
+          <label
+            htmlFor="photo"
+            className={`dropzone${dragging ? ' dragging' : ''}`}
+            onDragOver={(event) => {
+              event.preventDefault();
+              setDragging(true);
+            }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={(event) => {
+              event.preventDefault();
+              setDragging(false);
+              pickImage(event.dataTransfer.files?.[0]);
+            }}
+          >
+            <span className="dropzone-icon">
+              <ImagePlus size={22} aria-hidden="true" />
             </span>
-          )}
+            <span className="dropzone-title">Add a photo of the meal</span>
+            <span className="dropzone-hint">
+              Drop it here or click to choose · JPEG, PNG or WebP
+            </span>
+          </label>
+        )}
+
+        <div className="field">
+          <label htmlFor="description">Describe it</label>
+          <div className="textarea-wrap">
+            <textarea
+              id="description"
+              rows={4}
+              maxLength={2000}
+              value={description}
+              placeholder="Rice, dal and a vegetable sabzi. Two ladles of dal."
+              onChange={(event) => setDescription(event.target.value)}
+            />
+            <button
+              type="button"
+              className={`mic${recording ? ' live' : ''}`}
+              onClick={() => void toggleRecording()}
+              disabled={busy !== null && !recording}
+              aria-pressed={recording}
+              aria-label={recording ? 'Stop recording' : 'Describe by voice'}
+              title={recording ? 'Stop recording' : 'Describe by voice'}
+            >
+              {recording ? (
+                <Square size={14} aria-hidden="true" />
+              ) : (
+                <Mic size={17} aria-hidden="true" />
+              )}
+            </button>
+          </div>
+          <p className="field-hint" role="status">
+            {recording
+              ? 'Listening… tap the square when you are done.'
+              : busy === 'transcribing'
+                ? 'Transcribing…'
+                : 'A photo and a sentence together read best.'}
+          </p>
         </div>
+
+        <button
+          type="button"
+          className="button primary block"
+          disabled={!canAnalyse}
+          onClick={() => void analyse()}
+        >
+          {busy === 'analysing' ? (
+            <>
+              <Loader2 size={17} className="spin" aria-hidden="true" /> Reading the meal…
+            </>
+          ) : (
+            <>
+              Analyse this meal <ArrowRight size={17} aria-hidden="true" />
+            </>
+          )}
+        </button>
       </section>
 
-      {result && (
-        <section className="card" aria-live="polite">
-          <h2 style={{ margin: '0 0 6px', fontSize: '1.1rem' }}>
-            {result.status === 'ready' ? 'What we found' : 'Check this before you trust it'}
-          </h2>
-          <p className="meta" style={{ marginBottom: 10 }}>
-            Overall confidence {Math.round(result.overall_confidence * 100)}%.
-          </p>
+      <section className="results" aria-live="polite" aria-busy={busy === 'analysing'}>
+        {failure && (
+          <div className="alert" role="alert">
+            <AlertCircle size={18} aria-hidden="true" />
+            <p>{failure.message}</p>
+            <button type="button" aria-label="Dismiss" onClick={() => setFailure(null)}>
+              <X size={16} aria-hidden="true" />
+            </button>
+          </div>
+        )}
 
-          {result.questions.map((item) => (
-            <div className="banner ask" key={item.id}>
-              <p style={{ margin: 0, fontWeight: 600 }}>{item.question}</p>
-              <div className="chips">
-                {[...item.options, 'Not sure'].map((option) => (
+        {busy === 'analysing' && (
+          <div className="panel loading">
+            <div className="progress" />
+            <p className="eyebrow">02 / Reading</p>
+            <h2>Looking at the plate…</h2>
+            <p className="muted">
+              {image
+                ? 'Photos usually take 30 to 45 seconds.'
+                : 'Descriptions usually take a few seconds.'}{' '}
+              <span className="tabular">{elapsed}s</span>
+            </p>
+            <div className="skeleton-list" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+            </div>
+          </div>
+        )}
+
+        {!result && busy !== 'analysing' && (
+          <div className="panel empty">
+            <p className="eyebrow">02 / Result</p>
+            <h2>Your breakdown appears here.</h2>
+            <ol className="empty-steps">
+              <li>
+                <span>1</span> Every food, with a portion range
+              </li>
+              <li>
+                <span>2</span> The model&rsquo;s own confidence for each
+              </li>
+              <li>
+                <span>3</span> A question wherever it is unsure
+              </li>
+            </ol>
+            <p className="muted small">
+              Foods and portions only. MealSight never estimates calories.
+            </p>
+          </div>
+        )}
+
+        {result && busy !== 'analysing' && (
+          <>
+            <div className="panel">
+              <div className="result-head">
+                <div>
+                  <p className="eyebrow">02 / Result</p>
+                  <h2>
+                    {result.status === 'ready'
+                      ? 'Here is what we found.'
+                      : 'Check this before you trust it.'}
+                  </h2>
+                </div>
+                <div
+                  className="meter"
+                  aria-label={`Overall confidence ${Math.round(result.overall_confidence * 100)}%`}
+                >
+                  <span className="meter-value">
+                    {Math.round(result.overall_confidence * 100)}%
+                  </span>
+                  <span className="meter-label">overall confidence</span>
+                  <span className="meter-track">
+                    <span style={{ width: `${Math.round(result.overall_confidence * 100)}%` }} />
+                  </span>
+                </div>
+              </div>
+
+              {result.questions.length > 0 && (
+                <div className="questions">
+                  {result.questions.map((item) => (
+                    <fieldset className="question" key={item.id}>
+                      <legend>{item.question}</legend>
+                      <div className="chips">
+                        {answerOptions(item.options).map((option) => (
+                          <button
+                            type="button"
+                            key={option}
+                            className={answers[item.id] === option ? 'chip selected' : 'chip'}
+                            aria-pressed={answers[item.id] === option}
+                            onClick={() =>
+                              setAnswers((current) => ({ ...current, [item.id]: option }))
+                            }
+                          >
+                            {answers[item.id] === option && <Check size={14} aria-hidden="true" />}
+                            {option}
+                          </button>
+                        ))}
+                      </div>
+                    </fieldset>
+                  ))}
+                  {answeredCount > 0 && (
+                    <button
+                      type="button"
+                      className="button primary"
+                      disabled={busy !== null}
+                      onClick={() => void reanalyseWithAnswers()}
+                    >
+                      <RotateCcw size={16} aria-hidden="true" />
+                      Read it again with {answeredCount === 1 ? 'my answer' : 'my answers'}
+                    </button>
+                  )}
+                </div>
+              )}
+
+              <ul className="foods">
+                {result.foods.map((food) => {
+                  const label = confidenceLabel(food.confidence);
+                  return (
+                    <li className="food" key={`${food.name}-${food.lookup_query}`}>
+                      <div className="food-top">
+                        <h3>{food.name}</h3>
+                        <span className={`pill ${label.className}`}>
+                          {label.text} · {Math.round(food.confidence * 100)}%
+                        </span>
+                      </div>
+                      <p className="food-meta">
+                        {portionText(food)}
+                        {food.preparation ? ` · ${food.preparation}` : ''}
+                      </p>
+                      <PortionBar food={food} scale={scale} />
+                      {food.hidden_components.length > 0 && (
+                        <ul className="tags">
+                          {food.hidden_components.map((component) => (
+                            <li key={component}>may include {component}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+
+              {result.notes.length > 0 && (
+                <ul className="notes">
+                  {result.notes.map((note) => (
+                    <li key={note}>{note}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <div className="panel coach">
+              <p className="eyebrow">03 / Ask about it</p>
+              <h2>Question the breakdown.</h2>
+              <div className="suggestions">
+                {SUGGESTIONS.map((suggestion) => (
                   <button
-                    key={option}
-                    aria-pressed={answers[item.id] === option}
-                    onClick={() => setAnswers((current) => ({ ...current, [item.id]: option }))}
+                    type="button"
+                    key={suggestion}
+                    className="chip"
+                    disabled={busy !== null}
+                    onClick={() => void ask(suggestion)}
                   >
-                    {answers[item.id] === option ? `✓ ${option}` : option}
+                    {suggestion}
                   </button>
                 ))}
               </div>
-            </div>
-          ))}
-
-          {answeredCount > 0 && (
-            <div className="row" style={{ marginTop: 0, marginBottom: 14 }}>
-              <button
-                className="primary"
-                disabled={busy !== null}
-                onClick={() => void reanalyseWithAnswers()}
+              <form
+                className="ask-row"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void ask();
+                }}
               >
-                Read it again with {answeredCount === 1 ? 'my answer' : 'my answers'}
-              </button>
-            </div>
-          )}
+                <label htmlFor="question" className="visually-hidden">
+                  Your question
+                </label>
+                <input
+                  id="question"
+                  type="text"
+                  maxLength={500}
+                  value={question}
+                  placeholder="Which of these has the most protein?"
+                  onChange={(event) => setQuestion(event.target.value)}
+                />
+                <button
+                  type="submit"
+                  className="button primary"
+                  disabled={!question.trim() || busy !== null}
+                  aria-label="Ask"
+                >
+                  {busy === 'asking' ? (
+                    <Loader2 size={17} className="spin" aria-hidden="true" />
+                  ) : (
+                    <Send size={16} aria-hidden="true" />
+                  )}
+                </button>
+              </form>
 
-          {result.foods.map((food) => {
-            const label = confidenceLabel(food.confidence);
-            return (
-              <article className="food" key={`${food.name}-${food.lookup_query}`}>
-                <h3>
-                  {food.name}
-                  <span className={`confidence ${label.className}`}>
-                    {label.text} · {Math.round(food.confidence * 100)}%
-                  </span>
-                </h3>
-                <p className="meta">
-                  {portionText(food)}
-                  {food.preparation ? ` · ${food.preparation}` : ''}
-                </p>
-                {food.hidden_components.length > 0 && (
-                  <ul className="hidden-components">
-                    {food.hidden_components.map((component) => (
-                      <li key={component}>Possibly includes {component}</li>
-                    ))}
-                  </ul>
-                )}
-              </article>
-            );
-          })}
-
-          {result.notes.length > 0 && (
-            <ul className="hidden-components">
-              {result.notes.map((note) => (
-                <li key={note}>{note}</li>
-              ))}
-            </ul>
-          )}
-        </section>
-      )}
-
-      {result && (
-        <section className="card">
-          <label htmlFor="question">Ask about this meal</label>
-          <input
-            id="question"
-            type="text"
-            maxLength={500}
-            value={question}
-            placeholder="Which of these has the most protein?"
-            onChange={(event) => setQuestion(event.target.value)}
-          />
-          <div className="row">
-            <button disabled={!question.trim() || busy !== null} onClick={() => void ask()}>
-              Ask
-            </button>
-            {answer && (
-              <button onClick={() => void readAloud(answer.answer)} disabled={busy !== null}>
-                Read aloud
-              </button>
-            )}
-          </div>
-          {answer && (
-            <div aria-live="polite">
-              <p style={{ marginBottom: 4 }}>{answer.answer}</p>
-              {answer.based_on.length > 0 && (
-                <p className="meta">Based on {answer.based_on.join(', ')}.</p>
+              {answer && (
+                <div className="answer">
+                  <p>{answer.answer}</p>
+                  <div className="answer-foot">
+                    {answer.based_on.length > 0 && (
+                      <p className="muted small">Based on {answer.based_on.join(', ')}</p>
+                    )}
+                    <button
+                      type="button"
+                      className="chip-button"
+                      onClick={() => void readAloud(answer.answer)}
+                      disabled={busy !== null}
+                    >
+                      {busy === 'speaking' ? (
+                        <Loader2 size={15} className="spin" aria-hidden="true" />
+                      ) : (
+                        <Volume2 size={15} aria-hidden="true" />
+                      )}
+                      Read aloud
+                    </button>
+                  </div>
+                  {audioUrl && (
+                    // The same words are on screen directly above, so the audio is a
+                    // convenience rather than the only way to receive the answer.
+                    <audio controls autoPlay src={audioUrl} aria-label="The answer read aloud" />
+                  )}
+                </div>
               )}
             </div>
-          )}
-          {audioUrl && (
-            // The same words are on screen directly above, so the audio is a
-            // convenience rather than the only way to receive the answer.
-            <audio controls src={audioUrl} aria-label="The answer read aloud" />
-          )}
-        </section>
-      )}
-    </>
+          </>
+        )}
+      </section>
+    </div>
   );
 }

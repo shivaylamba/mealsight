@@ -1,5 +1,9 @@
 import type { Metadata, Viewport } from 'next';
+import { Manrope, Onest } from 'next/font/google';
 import './globals.css';
+
+const heading = Manrope({ subsets: ['latin'], variable: '--font-heading', display: 'swap' });
+const body = Onest({ subsets: ['latin'], variable: '--font-body', display: 'swap' });
 
 export const metadata: Metadata = {
   title: 'MealSight',
@@ -10,12 +14,12 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  themeColor: '#f5f6f0',
+  themeColor: '#f7f8f1',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className={`${heading.variable} ${body.variable}`}>
       <body>
         <a className="skip-link" href="#main">
           Skip to content
