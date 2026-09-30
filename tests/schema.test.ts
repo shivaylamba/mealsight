@@ -47,6 +47,22 @@ describe('the model cannot report nutrition', () => {
     assert.equal(parsed.success, false);
   });
 
+  test('a missing question list reads as no questions, nothing else', () => {
+    const base = {
+      contains_food: true,
+      rejection_reason: null,
+      foods: [],
+      overall_confidence: 0.7,
+      notes: [],
+    };
+    const parsed = analysisSchema.safeParse(base);
+    assert.equal(parsed.success, true);
+    assert.deepEqual(parsed.data?.questions, []);
+    // Only questions has a default; other omissions still fail.
+    const { notes: _notes, ...withoutNotes } = base;
+    assert.equal(analysisSchema.safeParse(withoutNotes).success, false);
+  });
+
   test('a coach reply must say what it relied on', () => {
     assert.equal(coachReplySchema.safeParse({ answer: 'Chicken.' }).success, false);
     assert.equal(

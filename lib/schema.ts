@@ -57,7 +57,12 @@ export const analysisSchema = z
     contains_food: z.boolean(),
     rejection_reason: rejectionReason.nullable(),
     foods: z.array(foodSchema).max(40),
-    questions: z.array(questionSchema).max(8),
+    /**
+     * Some models drop this key when they have nothing to ask. Absent means
+     * none: the gate writes its own question for the least certain food, so
+     * a missing list cannot let an uncertain meal through unasked.
+     */
+    questions: z.array(questionSchema).max(8).default([]),
     overall_confidence: z.number().finite().min(0).max(1),
     notes: z.array(z.string().trim().min(1).max(240)).max(12),
   })
