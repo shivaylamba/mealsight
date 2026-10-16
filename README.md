@@ -81,15 +81,33 @@ http://localhost:3000/analyse, add a photograph or a description, and press
 
 There is no default model, on purpose: an unset `NEBIUS_VISION_MODEL` fails with
 a message naming the variable rather than quietly billing a model you did not
-choose. `.env.example` suggests a working pair. Any vision-capable catalog model
-will do, and `GET /api/health` reports which variables are still missing.
+choose. `GET /api/health` reports which variables are still missing.
 
-If every analysis comes back with a `timeout` error while the coach still
-answers, the vision model itself is unavailable on Nebius, not the app. Switch
-to `NEBIUS_VISION_MODEL=google/gemma-3-27b-it` and restart. It reads meals and
-photographs just as well; it is the second choice only because it more often
-returns a reply that fails validation on things that are not food, which still
-ends in an error rather than a wrong answer.
+### Vision-language model
+
+MealSight's sample configuration uses
+[NVIDIA Nemotron 3.5 Super VL on Nebius Token Factory](https://tokenfactory.nebius.com/?modals=endpoint-details&model-id=nvidia/Nemotron-3.5-Super-VL)
+for meal analysis, replacing Kimi K3. This vision-language model accepts text
+and images; MealSight sends it a meal photograph, a description, or both to
+identify foods, estimate portions, and report confidence and clarification
+questions. Replies still pass through the strict Zod schema and confidence
+gate; the model does not report calories or macronutrients.
+
+```dotenv
+NEBIUS_VISION_MODEL=nvidia/Nemotron-3.5-Super-VL
+NEBIUS_COACH_MODEL=Qwen/Qwen3-30B-A3B-Instruct-2507
+NEBIUS_RESPONSE_FORMAT=json_object
+```
+
+For an existing installation, update `NEBIUS_VISION_MODEL` in `.env.local` or
+your hosting provider's environment settings, then restart or redeploy the
+app. Updating `.env.example` does not overwrite an existing environment.
+The coach continues to use Qwen through the same Nebius API key and endpoint.
+
+If analysis requests time out, check the configured model's availability in
+Nebius Token Factory and the server logs. Another vision-capable catalog model
+can be selected through `NEBIUS_VISION_MODEL`; validate its replies against the
+app's schema and confidence gate before using it.
 
 Deployed publicly, every visitor spends your model credit. `proxy.ts` allows
 30 paid requests (analyse, coach, voice) per address per 10 minutes, set by
